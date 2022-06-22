@@ -59,7 +59,7 @@ class GSConv(nn.Module):
         xd =  self.dwconv(x)
         x = torch.cat((x,xd),1)
         _,C,_,_ = x.shape
-        x = channel_shuffle(x, C)
+        x = channel_shuffle(x, C//2)
         return x
 
 class GSConvBottleNeck(nn.Module):
