@@ -54,20 +54,24 @@ def channel_shuffle(x, groups):
     return x
 
 class GSConv(nn.Module):
-    # Slim-neck by GSConv
-    def __init__(self, c1, c2, k=1, s=1, p=None, bias=True):  # ch_in, ch_out, kernel, stride, padding, groups
-        super(GSConv, self).__init__()
-        self.conv = Conv(c1, c2//2, k, s, p)
-        self.dwconv = depthwise_separable_conv(c2//2, c2//2, 3, 1, 1, bias=bias)
-        # self.shuf = nn.ChannelShuffle(c2)
+    # GSConv https://github.com/AlanLi1997/slim-neck-by-gsconv
+    def __init__(self, c1, c2, k=1, s=1, g=1, act=True):
+        super().__init__()
+        c_ = c2 // 2
+        self.cv1 = Conv(c1, c_, k, s, None, g, act)
+        self.cv2 = Conv(c_, c_, 5, 1, None, c_, act)
 
     def forward(self, x):
-        x = self.conv(x)
-        xd =  self.dwconv(x)
-        x = torch.cat((x,xd),1)
-        _,C,_,_ = x.shape
-        x = channel_shuffle(x, C//2)
-        return x
+        x1 = self.cv1(x)
+        x2 = torch.cat((x1, self.cv2(x1)), 1)
+        # shuffle
+        b, n, h, w = x2.data.size()
+        b_n = b * n // 2
+        y = x2.reshape(b_n, 2, h * w)
+        y = y.permute(1, 0, 2)
+        y = y.reshape(2, -1, n // 2, h, w)
+
+        return torch.cat((y[0], y[1]), 1)
 
 class GSConvBottleNeck(nn.Module):
     # Slim-neck by GSConv
